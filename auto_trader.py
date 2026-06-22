@@ -39,6 +39,29 @@ ARM_FILE = ROOT / "ARMED"
 GOLD_MAX_UNITS = 50  # extra hard cap on gold units, belt-and-suspenders
 
 
+APPROVED_FILE = ROOT / "agents" / "APPROVED_SIZING.json"
+try:
+    APPROVED = json.loads(APPROVED_FILE.read_text()) if APPROVED_FILE.exists() else None
+except Exception:
+    APPROVED = None
+
+
+def voltarget_fraction(gold_rows, sizing):
+    """Live vol-target position fraction from the approved risk envelope: scale exposure so gold's
+    recent realized vol hits the target annual vol, capped by max_leverage. Vol-responsive (the live
+    analogue of the backtest sizing that made the config pass the gate)."""
+    px = np.asarray([c for _, c in gold_rows], float)
+    if len(px) < 5:
+        return config.MAX_POSITION_PCT
+    ret = np.diff(px) / px[:-1]
+    lb = int(sizing.get("vol_lookback_days", 20))
+    w = ret[-lb:] if len(ret) >= lb else ret
+    rv = float(w.std()) * (252 ** 0.5)
+    if rv < 1e-9:
+        return 0.0
+    return min(float(sizing.get("max_leverage", 1.0)), float(sizing["vol_target_annual"]) / rv)
+
+
 def is_armed():
     return config.EXECUTION_ENABLED or ARM_FILE.exists()
 
@@ -112,7 +135,7 @@ def gold_position(ib):
     return 0.0, None
 
 
-def reconcile_gold(ib, desired_long, netliq, dry=False):
+def reconcile_gold(ib, desired_long, netliq, dry=False, frac=None):
     """Bring the gold paper position in line with desired_long, risk-capped."""
     gold = Commodity("XAUUSD", "SMART", "USD")
     ib.qualifyContracts(gold)
@@ -124,7 +147,8 @@ def reconcile_gold(ib, desired_long, netliq, dry=False):
         ib.sleep(2.0)
         px = tkr.last or tkr.close or tkr.delayedLast or tkr.delayedClose or 0
         if px and px == px and px > 0:
-            cap_notional = netliq * config.MAX_POSITION_PCT
+            use_frac = config.MAX_POSITION_PCT if frac is None else min(frac, config.MAX_POSITION_PCT)
+            cap_notional = netliq * use_frac
             target_units = min(GOLD_MAX_UNITS, int(cap_notional // px))
     delta = target_units - int(cur)
     print(f"  gold: current={cur} target={target_units} delta={delta}")
@@ -190,10 +214,16 @@ def main():
                 print(f"    {nm:<22} {vd:<5} Sharpe={sh:>5}  signal={sg:.0f}")
             desired_long = champ_sig >= 1.0
             print(f"  champion={champ_name} (Sharpe {champ_sharpe}) -> desired_long={desired_long}")
-            res = reconcile_gold(ib, desired_long, netliq, dry=args.dry)
+            frac = None
+            if APPROVED and champ_name == APPROVED.get("strategy"):
+                frac = voltarget_fraction(gold_rows, APPROVED["sizing"])
+                print(f"  using APPROVED sizing for {champ_name}: vol_target="
+                      f"{APPROVED['sizing']['vol_target_annual']} -> live vol-target frac={frac:.3f} "
+                      f"(capped at MAX_POSITION_PCT={config.MAX_POSITION_PCT})")
+            res = reconcile_gold(ib, desired_long, netliq, dry=args.dry, frac=frac)
             log({"event": "forward_test", "champion": champ_name, "champ_sharpe": champ_sharpe,
                  "desired_long": desired_long, "armed": is_armed(), "dry": args.dry,
-                 "signals": {nm: sg for nm, vd, sh, sg in ranked}, **res})
+                 "approved_frac": frac, "signals": {nm: sg for nm, vd, sh, sg in ranked}, **res})
         else:
             print("  evaluating strategies through the gate ...")
             passers, desired_long = gate_pass_signals(gold_rows)

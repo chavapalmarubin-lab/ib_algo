@@ -1,0 +1,11 @@
+{
+  "strategy": "gold_trend_ma",
+  "sizing": {
+    "vol_target_annual": 0.03,
+    "vol_lookback_days": 10,
+    "max_leverage": 1.0
+  },
+  "approved": "2026-06-22 CEO",
+  "source": "improver proposal",
+  "note": "forward-test on PAPER to earn a live track record; capped by MAX_POSITION_PCT"
+}
