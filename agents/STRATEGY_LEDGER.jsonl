@@ -1,0 +1,3 @@
+{"ts": "2026-06-22T10:54:41", "strategy": "gold_realyield", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.52, "max_dd_pct": 8.3, "oos_return_pct": 10.5, "ruin_pct": 21.79, "lookback": 20, "trades": 47}
+{"ts": "2026-06-22T10:54:41", "strategy": "gold_trend_ma", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.46, "max_dd_pct": 5.7, "oos_return_pct": 45.6, "ruin_pct": 11.6, "lookback": 50, "trades": 23}
+{"ts": "2026-06-22T10:54:41", "strategy": "gold_donchian", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 6.2, "oos_return_pct": 8.5, "ruin_pct": 5.27, "lookback": 50, "trades": 55}
