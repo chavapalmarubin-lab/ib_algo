@@ -63,6 +63,19 @@ def gate_pass_signals(gold_rows):
     return passers, desired_long
 
 
+def ranked_signals(gold_rows):
+    """Every strategy's OOS verdict + Sharpe + today's live signal, ranked by Sharpe desc.
+    Forward-test trades the champion (rank 1) regardless of the gate; logs all the rest as the
+    live learning substrate (per-strategy signals each cycle)."""
+    rows = []
+    for name, thesis, px, drv, mk in lab.build_strategies(gold_rows):
+        r = engine.walk_forward(px, drv, mk, lab.CFG)
+        sig = float(mk(np.asarray(drv, float), r["lookback"])[-1])
+        rows.append((name, r["verdict"], r["oos"]["sharpe"], sig))
+    rows.sort(key=lambda x: x[2], reverse=True)
+    return rows
+
+
 def proof_trade(ib):
     """Tiny SPY market round-trip on paper: buy 1 -> fill -> sell 1 -> flat."""
     spy = Stock("SPY", "SMART", "USD")
@@ -99,7 +112,7 @@ def gold_position(ib):
     return 0.0, None
 
 
-def reconcile_gold(ib, desired_long, netliq):
+def reconcile_gold(ib, desired_long, netliq, dry=False):
     """Bring the gold paper position in line with desired_long, risk-capped."""
     gold = Commodity("XAUUSD", "SMART", "USD")
     ib.qualifyContracts(gold)
@@ -118,9 +131,10 @@ def reconcile_gold(ib, desired_long, netliq):
     if delta == 0:
         return {"action": "hold", "current": cur, "target": target_units}
     side = "BUY" if delta > 0 else "SELL"
-    if not is_armed():
-        print(f"  DISARMED -> would {side} {abs(delta)} XAUUSD (placing nothing)")
-        return {"action": f"would_{side.lower()}", "qty": abs(delta), "armed": False}
+    if (not is_armed()) or dry:
+        tag = "DRY" if dry else "DISARMED"
+        print(f"  {tag} -> would {side} {abs(delta)} XAUUSD (placing nothing)")
+        return {"action": f"would_{side.lower()}", "qty": abs(delta), "armed": is_armed() and not dry}
     t = ib.placeOrder(gold, MarketOrder(side, abs(delta)))
     for _ in range(40):
         ib.sleep(0.5)
@@ -136,6 +150,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--proof", action="store_true", help="one-time SPY round-trip proof")
     ap.add_argument("--once", action="store_true", help="single eval+reconcile pass")
+    ap.add_argument("--forward-test", dest="forward_test", action="store_true",
+                    help="paper-trade the TOP-ranked strategy's live signal regardless of the gate")
+    ap.add_argument("--dry", action="store_true", help="force dry-run: print what it WOULD do, place nothing")
     args = ap.parse_args()
 
     if pathlib.Path(config.KILL_SWITCH_FILE).exists():
@@ -160,20 +177,33 @@ def main():
         if args.proof:
             proof_trade(ib)
 
-        print("  evaluating strategies through the gate ...")
         gold_rows = ibdata.gold_daily(years="8", cid_offset=20)
         if not gold_rows:
             print("  no gold data — holding, nothing placed.")
             log({"event": "skip", "reason": "no_data"})
             return
-        passers, desired_long = gate_pass_signals(gold_rows)
-        for name, verdict, sig in passers:
-            print(f"    {name:<16} {verdict:<5} today_signal={sig:.0f}")
-        n_pass = sum(1 for _, v, _ in passers if v == "PASS")
-        print(f"  gate-pass strategies: {n_pass}  -> desired_long={desired_long}")
-        res = reconcile_gold(ib, desired_long, netliq)
-        log({"event": "cycle", "n_pass": n_pass, "desired_long": desired_long,
-             "armed": is_armed(), **res})
+        if args.forward_test:
+            ranked = ranked_signals(gold_rows)
+            champ_name, champ_verdict, champ_sharpe, champ_sig = ranked[0]
+            print("  FORWARD-TEST (paper): trade the TOP-ranked strategy live, regardless of the gate")
+            for nm, vd, sh, sg in ranked:
+                print(f"    {nm:<22} {vd:<5} Sharpe={sh:>5}  signal={sg:.0f}")
+            desired_long = champ_sig >= 1.0
+            print(f"  champion={champ_name} (Sharpe {champ_sharpe}) -> desired_long={desired_long}")
+            res = reconcile_gold(ib, desired_long, netliq, dry=args.dry)
+            log({"event": "forward_test", "champion": champ_name, "champ_sharpe": champ_sharpe,
+                 "desired_long": desired_long, "armed": is_armed(), "dry": args.dry,
+                 "signals": {nm: sg for nm, vd, sh, sg in ranked}, **res})
+        else:
+            print("  evaluating strategies through the gate ...")
+            passers, desired_long = gate_pass_signals(gold_rows)
+            for name, verdict, sig in passers:
+                print(f"    {name:<16} {verdict:<5} today_signal={sig:.0f}")
+            n_pass = sum(1 for _, v, _ in passers if v == "PASS")
+            print(f"  gate-pass strategies: {n_pass}  -> desired_long={desired_long}")
+            res = reconcile_gold(ib, desired_long, netliq, dry=args.dry)
+            log({"event": "cycle", "n_pass": n_pass, "desired_long": desired_long,
+                 "armed": is_armed(), "dry": args.dry, **res})
         print("  cycle complete.")
     finally:
         ib.disconnect()
