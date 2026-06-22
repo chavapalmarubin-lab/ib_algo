@@ -7,3 +7,4 @@ KILL
 data/
 logs/
 *.log
+scout/reddit_raw.json
