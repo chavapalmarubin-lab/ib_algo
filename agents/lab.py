@@ -60,15 +60,79 @@ def s_donchian(px, lookback):
     return sig
 
 
+
+# ── indicators + new strategy signals added from the gold-video digest (2026-06-22) ──
+def _rsi(px, period):
+    """Wilder RSI over a close series (causal/point-in-time). Neutral 50 during warmup."""
+    px = np.asarray(px, float); n = len(px)
+    rsi = np.full(n, 50.0)
+    if n < period + 1:
+        return rsi
+    d = np.diff(px)
+    gain = np.where(d > 0, d, 0.0); loss = np.where(d < 0, -d, 0.0)
+    ag = gain[:period].mean(); al = loss[:period].mean()
+    for t in range(period, n):
+        ag = (ag * (period - 1) + gain[t - 1]) / period
+        al = (al * (period - 1) + loss[t - 1]) / period
+        rsi[t] = 100 - 100 / (1 + ag / (al + 1e-9))
+    return rsi
+
+
+def _dayofweek(dates):
+    import datetime as _dt
+    out = []
+    for d in dates:
+        try:
+            out.append(_dt.date.fromisoformat(str(d)[:10]).weekday())  # Mon=0 .. Thu=3 .. Sun=6
+        except Exception:
+            out.append(-1)
+    return np.asarray(out)
+
+
+def s_rsi2_meanrev(px, lookback):
+    """Connors RSI(2) mean-reversion (Chart Fanatics video), long-only, stateful:
+    enter long when close > SMA(200) AND RSI(2) < 20; exit when RSI(2) > 70.
+    Fully specified — `lookback` is unused (walk-forward evaluates it OOS as-is)."""
+    px = np.asarray(px, float); n = len(px)
+    sig = np.zeros(n); rsi = _rsi(px, 2); inpos = False
+    for t in range(n):
+        if t >= 200:
+            sma200 = px[t - 200:t].mean()
+            if not inpos and px[t] > sma200 and rsi[t] < 20:
+                inpos = True
+            elif inpos and rsi[t] > 70:
+                inpos = False
+        sig[t] = 1.0 if inpos else 0.0
+    return sig
+
+
+def s_rush_hold3(elig, lookback):
+    """'Gold Rush' seasonal (Chart Fanatics): on each eligibility bar (Thursday & RSI(2)<40,
+    precomputed in the driver) go long and hold 3 bars. `lookback` unused (fixed 3-bar hold)."""
+    elig = np.asarray(elig, float); sig = np.zeros(len(elig)); hold = 0
+    for t in range(len(elig)):
+        if elig[t] > 0:
+            hold = 3
+        if hold > 0:
+            sig[t] = 1.0; hold -= 1
+    return sig
+
+
 def build_strategies(gold_rows):
     """Return [(name, thesis, price_series, driver_series, make_signal)]. One IB fetch, reused."""
     ry_dates, ry_vals = GS.load_real_yield(RY_CSV)
     px_ry, drv_ry = GS.align(gold_rows, ry_dates, ry_vals)     # aligned (gold, real-yield)
     px = np.asarray([c for _, c in gold_rows], float)          # full gold closes
+    dates = [d for d, _ in gold_rows]
+    _rsi2 = _rsi(px, 2)
+    _dow = _dayofweek(dates)
+    elig_rush = np.where((_dow == 3) & (_rsi2 < 40), 1.0, 0.0)   # Thursday & RSI(2)<40
     return [
         ("gold_realyield", "long while 10y real-yield trend is down (TH Quant)", px_ry, drv_ry, GS.signal),
         ("gold_trend_ma",  "long while price > its SMA(lookback)",               px,    px,     s_trend_ma),
         ("gold_donchian",  "long on N-day close breakout",                       px,    px,     s_donchian),
+        ("gold_rsi2_meanrev", "RSI(2) mean-rev: close>SMA200 & RSI2<20 in, RSI2>70 out [Chart Fanatics]", px, px, s_rsi2_meanrev),
+        ("gold_rush_thu",     "seasonal: long Thursdays when RSI(2)<40, hold 3 bars [Chart Fanatics Gold Rush]", px, elig_rush, s_rush_hold3),
     ]
 
 

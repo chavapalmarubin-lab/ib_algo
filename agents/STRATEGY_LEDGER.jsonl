@@ -1,3 +1,8 @@
 {"ts": "2026-06-22T10:54:41", "strategy": "gold_realyield", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.52, "max_dd_pct": 8.3, "oos_return_pct": 10.5, "ruin_pct": 21.79, "lookback": 20, "trades": 47}
 {"ts": "2026-06-22T10:54:41", "strategy": "gold_trend_ma", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.46, "max_dd_pct": 5.7, "oos_return_pct": 45.6, "ruin_pct": 11.6, "lookback": 50, "trades": 23}
 {"ts": "2026-06-22T10:54:41", "strategy": "gold_donchian", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 6.2, "oos_return_pct": 8.5, "ruin_pct": 5.27, "lookback": 50, "trades": 55}
+{"ts": "2026-06-22T14:05:05", "strategy": "gold_realyield", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.51, "max_dd_pct": 8.3, "oos_return_pct": 10.3, "ruin_pct": 21.89, "lookback": 20, "trades": 47}
+{"ts": "2026-06-22T14:05:05", "strategy": "gold_trend_ma", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.46, "max_dd_pct": 5.7, "oos_return_pct": 45.6, "ruin_pct": 11.6, "lookback": 50, "trades": 23}
+{"ts": "2026-06-22T14:05:05", "strategy": "gold_donchian", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 6.2, "oos_return_pct": 8.5, "ruin_pct": 5.27, "lookback": 50, "trades": 55}
+{"ts": "2026-06-22T14:05:05", "strategy": "gold_rsi2_meanrev", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.5, "max_dd_pct": 6.5, "oos_return_pct": 6.7, "ruin_pct": 4.1, "lookback": 5, "trades": 37}
+{"ts": "2026-06-22T14:05:05", "strategy": "gold_rush_thu", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 4.6, "oos_return_pct": 6.0, "ruin_pct": 0.51, "lookback": 5, "trades": 48}
