@@ -1,0 +1,1 @@
+{"ts": "2026-06-22T18:42:43", "strategy": "gold_trend_ma", "improved_sizing": {"vol_target_annual": 0.03, "vol_lookback_days": 10, "max_leverage": 1.0}, "baseline_gates": 2, "improved_gates": 3, "oos": {"sharpe": 1.56, "max_dd_pct": 2.2, "total_return_pct": 18.0}, "mc": {"ruin_pct": 0.01}, "passes_full_gate": true}
