@@ -32,6 +32,19 @@ def gold_daily(years="8", cid_offset=20):
         ib.disconnect()
 
 
+def gold_ohlc_daily(years="8", cid_offset=23):
+    """[(YYYY-MM-DD, open, high, low, close)] daily spot-gold OHLC bars from IBKR (read-only)."""
+    ib = _connect(cid_offset)
+    try:
+        c = Commodity("XAUUSD", "SMART", "USD")
+        ib.qualifyContracts(c)
+        bars = ib.reqHistoricalData(c, endDateTime="", durationStr=f"{years} Y",
+                                    barSizeSetting="1 day", whatToShow="MIDPOINT", useRTH=False)
+        return [(str(b.date)[:10], float(b.open), float(b.high), float(b.low), float(b.close)) for b in bars]
+    finally:
+        ib.disconnect()
+
+
 def stock_daily(symbol, years="5", cid_offset=21):
     """[(YYYY-MM-DD, close)] daily bars for a US stock (for the value agent later)."""
     ib = _connect(cid_offset)

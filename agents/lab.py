@@ -118,6 +118,48 @@ def s_rush_hold3(elig, lookback):
     return sig
 
 
+def _heikin_signal(O, H, L, C):
+    """Heikin-Ashi trend-follow (The Moving Average video): long on the first BULLISH HA candle
+    with NO lower wick (HA_open == HA_low); hold while HA stays bullish; exit when a bearish HA closes.
+    Causal — uses only data up to t."""
+    O = np.asarray(O, float); H = np.asarray(H, float); L = np.asarray(L, float); C = np.asarray(C, float)
+    n = len(C)
+    ha_c = (O + H + L + C) / 4.0
+    ha_o = np.zeros(n); ha_o[0] = (O[0] + C[0]) / 2.0
+    for t in range(1, n):
+        ha_o[t] = (ha_o[t - 1] + ha_c[t - 1]) / 2.0
+    ha_l = np.minimum(L, np.minimum(ha_o, ha_c))
+    bull = ha_c > ha_o
+    no_lower_wick = (ha_o - ha_l) < (1e-4 * np.maximum(1.0, ha_o))
+    sig = np.zeros(n); inpos = False
+    for t in range(n):
+        if not inpos and bull[t] and no_lower_wick[t]:
+            inpos = True
+        elif inpos and not bull[t]:
+            inpos = False
+        sig[t] = 1.0 if inpos else 0.0
+    return sig
+
+
+def _breakout_signal(H, L, C):
+    """Prior-day high/low breakout (Currency Pros gold EA): long when close > previous bar's HIGH,
+    exit when close < previous bar's LOW. Causal."""
+    H = np.asarray(H, float); L = np.asarray(L, float); C = np.asarray(C, float)
+    n = len(C); sig = np.zeros(n); inpos = False
+    for t in range(1, n):
+        if not inpos and C[t] > H[t - 1]:
+            inpos = True
+        elif inpos and C[t] < L[t - 1]:
+            inpos = False
+        sig[t] = 1.0 if inpos else 0.0
+    return sig
+
+
+def s_passthrough(drv, lookback):
+    """The driver IS the precomputed 0/1 signal (used by OHLC strategies). lookback unused."""
+    return np.asarray(drv, float)
+
+
 def build_strategies(gold_rows):
     """Return [(name, thesis, price_series, driver_series, make_signal)]. One IB fetch, reused."""
     ry_dates, ry_vals = GS.load_real_yield(RY_CSV)
@@ -127,13 +169,30 @@ def build_strategies(gold_rows):
     _rsi2 = _rsi(px, 2)
     _dow = _dayofweek(dates)
     elig_rush = np.where((_dow == 3) & (_rsi2 < 40), 1.0, 0.0)   # Thursday & RSI(2)<40
-    return [
+    strategies = [
         ("gold_realyield", "long while 10y real-yield trend is down (TH Quant)", px_ry, drv_ry, GS.signal),
         ("gold_trend_ma",  "long while price > its SMA(lookback)",               px,    px,     s_trend_ma),
         ("gold_donchian",  "long on N-day close breakout",                       px,    px,     s_donchian),
         ("gold_rsi2_meanrev", "RSI(2) mean-rev: close>SMA200 & RSI2<20 in, RSI2>70 out [Chart Fanatics]", px, px, s_rsi2_meanrev),
         ("gold_rush_thu",     "seasonal: long Thursdays when RSI(2)<40, hold 3 bars [Chart Fanatics Gold Rush]", px, elig_rush, s_rush_hold3),
     ]
+    # OHLC strategies (need high/low/open) — best-effort second IB fetch; skipped if unavailable
+    try:
+        ohlc = ibdata.gold_ohlc_daily(years="8", cid_offset=23)
+        omap = {d: (o, h, l, c) for d, o, h, l, c in ohlc}
+        if gold_rows and all(d in omap for d, _ in gold_rows):
+            O = np.array([omap[d][0] for d, _ in gold_rows], float)
+            H = np.array([omap[d][1] for d, _ in gold_rows], float)
+            Lo = np.array([omap[d][2] for d, _ in gold_rows], float)
+            ha = _heikin_signal(O, H, Lo, px)
+            brk = _breakout_signal(H, Lo, px)
+            strategies += [
+                ("gold_heikin_trend",     "Heikin-Ashi trend-follow: long bullish no-lower-wick flip, exit bearish HA [The Moving Average]", px, ha,  s_passthrough),
+                ("gold_prevday_breakout", "prior-day breakout: long close>prev high, exit close<prev low [Currency Pros EA]",                  px, brk, s_passthrough),
+            ]
+    except Exception as _e:
+        print(f"  (OHLC strategies skipped: {_e})")
+    return strategies
 
 
 def track_record():
