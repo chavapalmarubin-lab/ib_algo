@@ -20,3 +20,10 @@
 {"ts": "2026-06-22T14:14:22", "strategy": "gold_rush_thu", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 4.6, "oos_return_pct": 6.0, "ruin_pct": 0.51, "lookback": 5, "trades": 48}
 {"ts": "2026-06-22T14:14:22", "strategy": "gold_heikin_trend", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.02, "max_dd_pct": 6.1, "oos_return_pct": 25.0, "ruin_pct": 12.93, "lookback": 5, "trades": 65}
 {"ts": "2026-06-22T14:14:22", "strategy": "gold_prevday_breakout", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.28, "max_dd_pct": 8.5, "oos_return_pct": 34.4, "ruin_pct": 9.49, "lookback": 5, "trades": 71}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_realyield", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.52, "max_dd_pct": 8.3, "oos_return_pct": 10.4, "ruin_pct": 22.03, "lookback": 20, "trades": 47}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_trend_ma", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.46, "max_dd_pct": 5.7, "oos_return_pct": 45.6, "ruin_pct": 12.27, "lookback": 50, "trades": 23}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_donchian", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.57, "max_dd_pct": 6.2, "oos_return_pct": 8.5, "ruin_pct": 5.39, "lookback": 50, "trades": 55}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_rsi2_meanrev", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.5, "max_dd_pct": 6.5, "oos_return_pct": 6.7, "ruin_pct": 4.24, "lookback": 5, "trades": 37}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_rush_thu", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 0.58, "max_dd_pct": 4.6, "oos_return_pct": 6.1, "ruin_pct": 0.43, "lookback": 5, "trades": 48}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_heikin_trend", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.03, "max_dd_pct": 6.1, "oos_return_pct": 25.2, "ruin_pct": 13.04, "lookback": 5, "trades": 64}
+{"ts": "2026-06-22T20:05:07", "strategy": "gold_prevday_breakout", "asset": "gold", "verdict": "FAIL", "oos_sharpe": 1.28, "max_dd_pct": 8.5, "oos_return_pct": 34.4, "ruin_pct": 10.78, "lookback": 5, "trades": 71}

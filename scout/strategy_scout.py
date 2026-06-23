@@ -19,7 +19,7 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent      # ~/ib_algo
 SCOUT = ROOT / "scout"
-RAW = SCOUT / "reddit_raw.json"
+RAW = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else SCOUT / "reddit_raw.json"
 LEDGER = SCOUT / "SCOUT_LEDGER.jsonl"
 DEEPINFRA_URL = "https://api.deepinfra.com/v1/openai/chat/completions"
 MODELS = ["zai-org/GLM-5.2", "deepseek-ai/DeepSeek-V3.2"]   # cheap open tier, fallback
