@@ -17,7 +17,7 @@ SWAP_PER_DAY_USD = -0.15                      # long-gold overnight financing (c
 ROUND_TURN = SPREAD_USD + 2 * SLIPPAGE_USD    # entry+exit slippage + spread = 0.70
 
 
-def vol_scale(gret, target, lb, max_lev):
+def vol_scale(gret, target, lb, max_lev, ppy=252):
     """Iteration-2 sizing: scale exposure to a constant annual vol using ONLY past returns."""
     n = len(gret)
     sc = np.ones(n)
@@ -26,20 +26,20 @@ def vol_scale(gret, target, lb, max_lev):
     for t in range(n):
         w = gret[max(0, t - lb):t]            # strictly past window (excludes t)
         if len(w) > 2:
-            rv = float(w.std()) * math.sqrt(252)
+            rv = float(w.std()) * math.sqrt(ppy)
             sc[t] = min(max_lev, target / rv) if rv > 1e-9 else 0.0
         else:
             sc[t] = 0.0
     return sc
 
 
-def backtest(px, sig, target, vol_lb, max_lev, start_equity=10000.0):
+def backtest(px, sig, target, vol_lb, max_lev, start_equity=10000.0, ppy=252, bars_per_day=1.0):
     px = np.asarray(px, float)
     sig = np.asarray(sig, float)
     ret = np.diff(px, prepend=px[0]) / px
-    pos = np.concatenate([[0.0], sig[:-1]]) * vol_scale(ret, target, vol_lb, max_lev)  # act next bar
+    pos = np.concatenate([[0.0], sig[:-1]]) * vol_scale(ret, target, vol_lb, max_lev, ppy)  # act next bar
     turn = np.abs(np.diff(pos, prepend=0.0))
-    cost_ret = turn * (ROUND_TURN / px) + pos * (abs(SWAP_PER_DAY_USD) / px)
+    cost_ret = turn * (ROUND_TURN / px) + pos * (abs(SWAP_PER_DAY_USD) / px) / bars_per_day  # swap is per DAY
     stratret = pos * ret - cost_ret
     eq = start_equity * np.cumprod(1 + stratret)
     trades, inpos, entry_i = [], False, 0
@@ -52,8 +52,8 @@ def backtest(px, sig, target, vol_lb, max_lev, start_equity=10000.0):
     return eq, stratret, np.array(trades)
 
 
-def metrics(eq, stratret):
-    ann = math.sqrt(252)
+def metrics(eq, stratret, ppy=252):
+    ann = math.sqrt(ppy)
     sharpe = (stratret.mean() / (stratret.std() + 1e-9)) * ann
     peak = np.maximum.accumulate(eq)
     dd = (eq - peak) / peak
@@ -75,7 +75,7 @@ def monte_carlo(stratret, ruin_dd_pct, paths=10000, start=10000.0):
     return {"ruin_pct": round(100 * ruined / paths, 2)}
 
 
-def walk_forward(px, drv, make_signal, cfg, lookbacks=range(5, 60, 5)):
+def walk_forward(px, drv, make_signal, cfg, lookbacks=range(5, 60, 5), ppy=252):
     """Gate 4: tune the ONE param in-sample (first 60%) by Sharpe, evaluate OOS (last 40%),
     then judge OOS against the validation gates. Returns the agent's PASS/FAIL verdict.
 
@@ -94,15 +94,15 @@ def walk_forward(px, drv, make_signal, cfg, lookbacks=range(5, 60, 5)):
     best = None
     for L in lookbacks:
         sig = make_signal(drv_is, L)
-        eq, sr, _ = backtest(px_is, sig, target, vol_lb, max_lev)
-        sh = metrics(eq, sr)["sharpe"]
+        eq, sr, _ = backtest(px_is, sig, target, vol_lb, max_lev, ppy=ppy, bars_per_day=max(1.0, ppy/252.0))
+        sh = metrics(eq, sr, ppy)["sharpe"]
         if best is None or sh > best[1]:
             best = (L, sh)
     L = best[0]
 
     sig = make_signal(drv_oos, L)
-    eq, sr, tr = backtest(px_oos, sig, target, vol_lb, max_lev)
-    m = metrics(eq, sr)
+    eq, sr, tr = backtest(px_oos, sig, target, vol_lb, max_lev, ppy=ppy, bars_per_day=max(1.0, ppy/252.0))
+    m = metrics(eq, sr, ppy)
     mc = monte_carlo(sr, cfg["drawdown_kill_switch"]["max_drawdown_pct"], v["montecarlo_paths"])
     passed = (m["sharpe"] >= v["min_sharpe"]
               and m["max_dd_pct"] <= v["max_backtest_dd_pct"]

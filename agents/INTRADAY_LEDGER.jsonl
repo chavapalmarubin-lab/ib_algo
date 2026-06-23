@@ -1,0 +1,6 @@
+{"ts": "2026-06-22T20:02:32", "bar": "15 mins", "strategy": "intraday_breakout_vol", "verdict": "FAIL", "oos_sharpe": -9.99, "max_dd_pct": 8.8, "ruin_pct": 4.28, "lookback": 5, "trades": 472, "ppy": 23252}
+{"ts": "2026-06-22T20:02:32", "bar": "15 mins", "strategy": "intraday_sma_cross", "verdict": "FAIL", "oos_sharpe": -7.72, "max_dd_pct": 9.9, "ruin_pct": 26.0, "lookback": 55, "trades": 25, "ppy": 23252}
+{"ts": "2026-06-22T20:02:32", "bar": "15 mins", "strategy": "intraday_zscore_mr", "verdict": "FAIL", "oos_sharpe": -7.0, "max_dd_pct": 9.6, "ruin_pct": 12.95, "lookback": 40, "trades": 87, "ppy": 23252}
+{"ts": "2026-06-22T20:04:09", "bar": "15 mins", "strategy": "intraday_breakout_vol", "verdict": "FAIL", "oos_sharpe": -8.55, "max_dd_pct": 7.6, "ruin_pct": 1.06, "lookback": 5, "trades": 472, "ppy": 23252}
+{"ts": "2026-06-22T20:04:09", "bar": "15 mins", "strategy": "intraday_sma_cross", "verdict": "FAIL", "oos_sharpe": -5.53, "max_dd_pct": 7.3, "ruin_pct": 5.24, "lookback": 55, "trades": 25, "ppy": 23252}
+{"ts": "2026-06-22T20:04:09", "bar": "15 mins", "strategy": "intraday_zscore_mr", "verdict": "FAIL", "oos_sharpe": -4.73, "max_dd_pct": 7.5, "ruin_pct": 1.56, "lookback": 40, "trades": 87, "ppy": 23252}
