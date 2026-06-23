@@ -92,10 +92,12 @@ def walk_forward(px, drv, make_signal, cfg, lookbacks=range(5, 60, 5), ppy=252):
     px_oos, drv_oos = px[split:], drv[split:]
 
     best = None
+    trial_shs = []
     for L in lookbacks:
         sig = make_signal(drv_is, L)
         eq, sr, _ = backtest(px_is, sig, target, vol_lb, max_lev, ppy=ppy, bars_per_day=max(1.0, ppy/252.0))
         sh = metrics(eq, sr, ppy)["sharpe"]
+        trial_shs.append(sh)
         if best is None or sh > best[1]:
             best = (L, sh)
     L = best[0]
@@ -108,4 +110,5 @@ def walk_forward(px, drv, make_signal, cfg, lookbacks=range(5, 60, 5), ppy=252):
               and m["max_dd_pct"] <= v["max_backtest_dd_pct"]
               and mc["ruin_pct"] <= v["montecarlo_ruin_pct_max"])
     return {"lookback": L, "is_sharpe": best[1], "oos": m, "mc": mc,
-            "trades": int(len(tr)), "verdict": "PASS" if passed else "FAIL"}
+            "trades": int(len(tr)), "verdict": "PASS" if passed else "FAIL",
+            "oos_ret": sr.tolist(), "trial_sharpes": trial_shs, "ppy": ppy}

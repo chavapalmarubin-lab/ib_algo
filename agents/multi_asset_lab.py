@@ -20,7 +20,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
 
-from core import engine, multidata
+from core import engine, multidata, stats, portfolio
 from agents.lab import (CFG, s_trend_ma, s_donchian, s_rsi2_meanrev,
                         _heikin_signal, _breakout_signal, s_passthrough)
 
@@ -45,6 +45,76 @@ def strategies_for(rows):
     out.append(("heikin_trend", px, _heikin_signal(O, H, Lo, px), s_passthrough))
     out.append(("prevday_breakout", px, _breakout_signal(H, Lo, px), s_passthrough))
     return out
+
+
+def _overfit_and_portfolio_report(matrix, summ):
+    """Track 2 (deflated Sharpe / multiple-testing) + Track 3 (risk-parity portfolio),
+    applied to the best cross-asset strategy. Research only; never trades."""
+    ranked = sorted(summ, key=lambda x: -x[3])
+    if not ranked:
+        return
+    champ = ranked[0][0]
+    per = matrix.get(champ, {})
+    if not per:
+        return
+    ppy = next(iter(per.values())).get("ppy", 252)
+    ann = np.sqrt(ppy)
+
+    # ---- global multiple-testing hurdle from ALL trials run ----
+    all_trials, n_trials = [], 0
+    for pm in matrix.values():
+        for r in pm.values():
+            ts = r.get("trial_sharpes", [])
+            n_trials += len(ts)
+            all_trials.extend(ts)
+    sr_trials_std = (float(np.std(all_trials)) / ann) if all_trials else 0.0
+    hurdle = stats.expected_max_sharpe(max(2, n_trials), sr_trials_std)
+
+    print("\n================ TRACK 2 — ANTI-OVERFIT (deflated Sharpe) ================")
+    print(f"  champion strategy : {champ}")
+    print(f"  trials searched   : {n_trials}  (strategy x instrument x lookback backtests)")
+    print(f"  multiple-testing hurdle Sharpe : {hurdle*ann:.2f} ann ({hurdle:.4f}/bar)")
+    print(f"  {'instrument':<12} {'OOS Sh':>7} {'DSR':>6}  verdict")
+    credible = 0
+    for inst, r in sorted(per.items(), key=lambda kv: -kv[1]["oos"]["sharpe"]):
+        oos = np.asarray(r.get("oos_ret", []), float)
+        if len(oos) < 30:
+            continue
+        dsr, _ = stats.deflated_sharpe_ratio(oos, n_trials, sr_trials_std)
+        ok = dsr >= 0.95
+        credible += int(ok)
+        print(f"  {inst:<12} {r['oos']['sharpe']:>7.2f} {dsr:>6.2f}  {'CREDIBLE' if ok else 'luck-risk'}")
+    print(f"  -> {credible}/{len(per)} instruments survive the trials-adjusted test (DSR>=0.95).")
+    print("     DSR = P(true Sharpe > hurdle) after skew/kurtosis + #trials. <0.95 = likely overfit.")
+
+    # ---- Track 3: risk-parity portfolio across instruments ----
+    series = {inst: np.asarray(r.get("oos_ret", []), float)
+              for inst, r in per.items() if len(r.get("oos_ret", [])) >= 30}
+    print("\n================ TRACK 3 — PORTFOLIO (risk parity across the universe) ================")
+    if len(series) < 2:
+        print("  need >=2 instruments with OOS returns to build a portfolio — skipped.")
+        return
+    pnames, R = portfolio.align_returns(series)
+    corr = portfolio.correlation_matrix(R)
+    iu = np.triu_indices(len(pnames), 1)
+    avg_corr = float(corr[iu].mean()) if len(iu[0]) else 0.0
+    w_iv = portfolio.inverse_vol_weights(R)
+    w_rp = portfolio.risk_parity_weights(R)
+    dr = portfolio.diversification_ratio(w_rp, R)
+    sh = lambda x: float(x.mean() / (x.std() + 1e-12)) * ann
+    port_rp = portfolio.combine(R, w_rp)
+    port_ew = portfolio.combine(R, np.ones(len(pnames)) / len(pnames))
+    single = [sh(R[:, i]) for i in range(len(pnames))]
+    print(f"  champion strategy : {champ}   instruments: {len(pnames)} ({', '.join(pnames)})")
+    print(f"  avg pairwise corr : {avg_corr:.2f}")
+    print(f"  {'instrument':<12} {'risk-parity':>12} {'inv-vol':>9}")
+    for nm, a, b in sorted(zip(pnames, w_rp, w_iv), key=lambda t: -t[1]):
+        print(f"  {nm:<12} {a:>11.1%} {b:>8.1%}")
+    print(f"  diversification ratio (risk-parity): {dr:.2f}   (1.0 = none; >1 = real diversification)")
+    print(f"  portfolio Sharpe  risk-parity={sh(port_rp):.2f}  equal-weight={sh(port_ew):.2f}"
+          f"  mean-single={np.mean(single):.2f}  best-single={max(single):.2f}")
+    print("  A risk-parity book that beats the mean single-asset Sharpe with diversification >1")
+    print("  is where the edge (if any) compounds with the least single-market dependence.")
 
 
 def main():
@@ -110,6 +180,7 @@ def main():
         summ.append((sname, npass, len(per), mean, pos, med))
     for sname, npass, ntot, mean, pos, med in sorted(summ, key=lambda x: -x[3]):
         print(f"  {sname:<16} {f'{npass}/{ntot}':>8} {mean:>9.2f} {pos:>7.0f}% {med:>8.2f}")
+    _overfit_and_portfolio_report(matrix, summ)
     print("\n  Read this column-down, not row-across: a strategy that PASSES on 1/10 instruments")
     print("  and has mean Sharpe ~0 is luck; one with mean Sharpe>0 across many is a candidate.")
     print("  Research/signal only — never trades. Verdicts are OOS, cost-realistic, point-in-time.")
